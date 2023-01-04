@@ -24,6 +24,7 @@ The purpose of authentication zero is to generate a pre-built authentication sys
 - Manage multiple sessions & devices
 - Activity log (--trackable)
 - Log out
+- [API documentation](https://github.com/lazaronixon/authentication-zero/blob/master/authentication-zero-api.md)
 
 ## Security and best practices
 
@@ -39,15 +40,73 @@ The purpose of authentication zero is to generate a pre-built authentication sys
 
 ## Installation
 
+Add this lines to your application's Gemfile:
+
+```ruby
+gem "authentication-zero"
 ```
-$ bundle add authentication-zero
+
+Then run `bundle install`
+
+You'll need to set the root path in your routes.rb, for this example let's use the following:
+
+```ruby
+root "home#index"
+```
+
+```
+rails generate controller home index
+```
+
+Add these lines to your `app/views/home/index.html.erb`:
+
+```html+erb
+<p style="color: green"><%= notice %></p>
+
+<% if signed_in? %>
+  <p>Signed as <%= Current.user.email %></p>
+
+  <div>
+    <%= link_to "Change email address", edit_identity_email_path %>
+  </div>
+
+  <div>
+    <%= link_to "Change password", edit_password_path %>
+  </div>
+
+  <div>
+    <%= link_to "Devices & Sessions", sessions_path %>
+  </div>
+
+  <div>
+    <%# link_to "Activity Log", authentications_events_path %>
+  </div>
+
+  <div>
+    <%# link_to "Two-Factor Authentication", new_two_factor_authentication_totp_path %>
+  </div>
+
+  <br>
+
+  <%= button_to "Log out", Current.session, method: :delete %>
+<% else %>
+  <p>You are not signed in. <%= link_to "Sign in", sign_in_path %> or <%= link_to "sign up", sign_up_path %>.</p>
+<% end %>
+```
+
+And you'll need to set up the default URL options for the mailer in each environment. Here is a possible configuration for `config/environments/development.rb`:
+
+```ruby
+config.action_mailer.default_url_options = { host: 'localhost', port: 3000 }
 ```
 
 ## Usage
 
 ```
-$ rails generate authentication
+rails generate authentication
 ```
+
+Then run `bundle install` again!
 
 ## Development
 
