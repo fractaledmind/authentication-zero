@@ -3,24 +3,21 @@ require "rails/generators/active_record"
 class AuthenticationGenerator < Rails::Generators::Base
   include ActiveRecord::Generators::Migration
 
-  class_option :api,             type: :boolean, desc: "Generates API authentication"
-  class_option :pwned,           type: :boolean, desc: "Add pwned password validation"
+  class_option :api, type: :boolean, desc: "Generates API authentication"
+  class_option :pwned, type: :boolean, desc: "Add pwned password validation"
   class_option :code_verifiable, type: :boolean, desc: "Add email verification using a code for api"
-  class_option :sudoable,        type: :boolean, desc: "Add password request before sensitive data changes"
-  class_option :lockable,        type: :boolean, desc: "Add password reset locking"
-  class_option :omniauthable,    type: :boolean, desc: "Add social login support"
-  class_option :trackable,       type: :boolean, desc: "Add activity log support"
-  class_option :two_factor,      type: :boolean, desc: "Add two factor authentication"
+  class_option :sudoable, type: :boolean, desc: "Add password request before sensitive data changes"
+  class_option :lockable, type: :boolean, desc: "Add password reset locking"
+  class_option :omniauthable, type: :boolean, desc: "Add social login support"
+  class_option :trackable, type: :boolean, desc: "Add activity log support"
+  class_option :two_factor, type: :boolean, desc: "Add two factor authentication"
 
   source_root File.expand_path("templates", __dir__)
 
   def add_gems
-    gem "bcrypt", "~> 3.1.7", comment: "Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]"
-
-    if redis?
-      gem "redis", ">= 4.0.1", comment: "Use Redis adapter to run additional authentication features"
-      gem "kredis", comment: "Use Kredis to get higher-level data types in Redis [https://github.com/rails/kredis]"
-    end
+    uncomment_lines "Gemfile", /"bcrypt"/
+    uncomment_lines "Gemfile", /"redis"/ if redis?
+    uncomment_lines "Gemfile", /"kredis"/ if redis?
 
     if options.pwned?
       gem "pwned", comment: "Use Pwned to check if a password has been found in any of the huge data breaches [https://github.com/philnash/pwned]"
@@ -37,11 +34,6 @@ class AuthenticationGenerator < Rails::Generators::Base
     end
   end
 
-  def add_environment_configurations
-    application "config.action_mailer.default_url_options = { host: \"localhost\", port: 3000 }", env: "development"
-    application "config.action_mailer.default_url_options = { host: \"localhost\", port: 3000 }", env: "test"
-  end
-
   def create_configuration_files
     copy_file "config/redis/shared.yml", "config/redis/shared.yml" if redis?
     copy_file "config/initializers/omniauth.rb", "config/initializers/omniauth.rb" if omniauthable?
@@ -50,16 +42,12 @@ class AuthenticationGenerator < Rails::Generators::Base
   def create_migrations
     migration_template "migrations/create_users_migration.rb", "#{db_migrate_path}/create_users.rb"
     migration_template "migrations/create_sessions_migration.rb", "#{db_migrate_path}/create_sessions.rb"
-    migration_template "migrations/create_email_verification_tokens_migration.rb", "#{db_migrate_path}/create_email_verification_tokens.rb"
-    migration_template "migrations/create_password_reset_tokens_migration.rb", "#{db_migrate_path}/create_password_reset_tokens.rb"
     migration_template "migrations/create_events_migration.rb", "#{db_migrate_path}/create_events.rb" if options.trackable?
   end
 
   def create_models
     template "models/user.rb", "app/models/user.rb"
     template "models/session.rb", "app/models/session.rb"
-    template "models/email_verification_token.rb", "app/models/email_verification_token.rb"
-    template "models/password_reset_token.rb", "app/models/password_reset_token.rb"
     template "models/current.rb", "app/models/current.rb"
     template "models/event.rb", "app/models/event.rb" if options.trackable?
   end
@@ -69,36 +57,30 @@ class AuthenticationGenerator < Rails::Generators::Base
   end
 
   def create_controllers
-    directory "controllers/concerns", "app/controllers/concerns"
-    template  "controllers/application_controller.rb", "app/controllers/application_controller.rb", force: true
+    template "controllers/#{format_folder}/application_controller.rb", "app/controllers/application_controller.rb", force: true
 
     directory "controllers/#{format_folder}/identity", "app/controllers/identity"
     directory "controllers/#{format_folder}/two_factor_authentication", "app/controllers/two_factor_authentication" if two_factor?
-    template  "controllers/#{format_folder}/sessions_controller.rb", "app/controllers/sessions_controller.rb"
-    template  "controllers/#{format_folder}/passwords_controller.rb", "app/controllers/passwords_controller.rb"
-    template  "controllers/#{format_folder}/registrations_controller.rb", "app/controllers/registrations_controller.rb"
-    template  "controllers/#{format_folder}/home_controller.rb", "app/controllers/home_controller.rb" unless options.api?
-    template  "controllers/#{format_folder}/sessions/sudos_controller.rb", "app/controllers/sessions/sudos_controller.rb" if options.sudoable?
-    template  "controllers/#{format_folder}/sessions/omniauth_controller.rb", "app/controllers/sessions/omniauth_controller.rb" if omniauthable?
-    template  "controllers/#{format_folder}/authentications/events_controller.rb", "app/controllers/authentications/events_controller.rb" if options.trackable?
+    template "controllers/#{format_folder}/sessions_controller.rb", "app/controllers/sessions_controller.rb"
+    template "controllers/#{format_folder}/passwords_controller.rb", "app/controllers/passwords_controller.rb"
+    template "controllers/#{format_folder}/registrations_controller.rb", "app/controllers/registrations_controller.rb"
+    template "controllers/#{format_folder}/sessions/sudos_controller.rb", "app/controllers/sessions/sudos_controller.rb" if options.sudoable?
+    template "controllers/#{format_folder}/sessions/omniauth_controller.rb", "app/controllers/sessions/omniauth_controller.rb" if omniauthable?
+    template "controllers/#{format_folder}/authentications/events_controller.rb", "app/controllers/authentications/events_controller.rb" if options.trackable?
   end
 
   def create_views
+    directory "erb/user_mailer", "app/views/user_mailer"
+    directory "erb/session_mailer", "app/views/session_mailer"
     if options.api?
-      directory "erb/user_mailer", "app/views/user_mailer"
-      directory "erb/session_mailer", "app/views/session_mailer"
     else
-      directory "erb/user_mailer", "app/views/user_mailer"
-      directory "erb/session_mailer", "app/views/session_mailer"
-
-      directory "erb/home", "app/views/home"
 
       directory "erb/identity", "app/views/identity"
       directory "erb/passwords", "app/views/passwords"
       directory "erb/registrations", "app/views/registrations"
 
-      template  "erb/sessions/index.html.erb", "app/views/sessions/index.html.erb"
-      template  "erb/sessions/new.html.erb", "app/views/sessions/new.html.erb"
+      template "erb/sessions/index.html.erb", "app/views/sessions/index.html.erb"
+      template "erb/sessions/new.html.erb", "app/views/sessions/new.html.erb"
 
       directory "erb/sessions/sudos", "app/views/sessions/sudos" if options.sudoable?
 
@@ -112,8 +94,6 @@ class AuthenticationGenerator < Rails::Generators::Base
   end
 
   def add_routes
-    route "root 'home#index'" unless options.api?
-
     if omniauthable?
       route "post '/auth/:provider/callback', to: 'sessions/omniauth#create'"
       route "get  '/auth/:provider/callback', to: 'sessions/omniauth#create'"
@@ -143,30 +123,30 @@ class AuthenticationGenerator < Rails::Generators::Base
 
   def create_test_files
     directory "test_unit/controllers/#{format_folder}", "test/controllers"
-    directory "test_unit/mailers/", "test/mailers"
     directory "test_unit/system", "test/system" unless options.api?
     template "test_unit/test_helper.rb", "test/test_helper.rb", force: true
     template "test_unit/application_system_test_case.rb", "test/application_system_test_case.rb", force: true unless options.api?
   end
 
   private
-    def format_folder
-      options.api? ? "api" : "html"
-    end
 
-    def omniauthable?
-      options.omniauthable? && !options.api?
-    end
+  def format_folder
+    options.api? ? "api" : "html"
+  end
 
-    def two_factor?
-      options.two_factor? && !options.api?
-    end
+  def omniauthable?
+    options.omniauthable? && !options.api?
+  end
 
-    def code_verifiable?
-      options.code_verifiable? && options.api?
-    end
+  def two_factor?
+    options.two_factor? && !options.api?
+  end
 
-    def redis?
-      options.lockable? || options.sudoable? || code_verifiable?
-    end
+  def code_verifiable?
+    options.code_verifiable? && options.api?
+  end
+
+  def redis?
+    options.lockable? || options.sudoable? || code_verifiable?
+  end
 end
